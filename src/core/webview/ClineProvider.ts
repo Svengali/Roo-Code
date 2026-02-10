@@ -3701,10 +3701,17 @@ export class ClineProvider
 					// non-fatal
 				}
 
-				// Clear delegation guard BEFORE resuming parent. The delegation
-				// state transition is complete — all metadata is persisted and the
-				// parent is reopened. The resumed parent may immediately delegate
-				// again (new_task), which needs delegationInProgress to be false.
+				// Clear delegation guard BEFORE resuming parent so the parent's
+				// task loop can itself initiate a new delegation (new_task) without
+				// hitting the "delegation already in progress" guard. This early
+				// reset is safe because all metadata is persisted and the parent
+				// instance is fully reconstructed at this point.
+				//
+				// The `finally` block at the bottom of this method also sets
+				// `delegationInProgress = false` as a safety net for error paths —
+				// if an exception is thrown before reaching this line, the finally
+				// block ensures the guard is always released. On the happy path
+				// the finally reset is a harmless no-op.
 				this.delegationInProgress = false
 
 				// Auto-resume parent without ask("resume_task")

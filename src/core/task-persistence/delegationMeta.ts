@@ -21,15 +21,22 @@ export interface DelegationMeta {
 	completionResultSummary?: string
 }
 
+/**
+ * Compile-time safeguard: this record must list exactly the keys of DelegationMeta.
+ * Adding or removing a key in the interface without updating this record
+ * will produce a TypeScript error, preventing silent drift.
+ */
+const _delegationMetaKeyRecord: Record<keyof Required<DelegationMeta>, true> = {
+	status: true,
+	delegatedToId: true,
+	awaitingChildId: true,
+	childIds: true,
+	completedByChildId: true,
+	completionResultSummary: true,
+}
+
 /** Known keys that may appear in a DelegationMeta object. */
-const DELEGATION_META_KEYS: ReadonlySet<string> = new Set<string>([
-	"status",
-	"delegatedToId",
-	"awaitingChildId",
-	"childIds",
-	"completedByChildId",
-	"completionResultSummary",
-])
+const DELEGATION_META_KEYS: ReadonlySet<string> = new Set<string>(Object.keys(_delegationMetaKeyRecord))
 
 export type ReadDelegationMetaOptions = {
 	taskId: string
