@@ -1054,8 +1054,6 @@ export class ClineProvider
 			onCreated: this.taskCreationCallback,
 			startTask: options?.startTask ?? true,
 			enableBridge: BridgeOrchestrator.isEnabled(cloudUserInfo, taskSyncEnabled),
-			// Preserve the status from the history item to avoid overwriting it when the task saves messages
-			initialStatus: historyItem.status,
 		})
 
 		if (isRehydratingCurrentTask) {
@@ -3395,9 +3393,6 @@ export class ClineProvider
 			}
 
 			// 4) Create child as sole active (parent reference preserved for lineage)
-			// Pass initialStatus: "active" to ensure the child task's historyItem is created
-			// with status from the start, avoiding race conditions where the task might
-			// call attempt_completion before status is persisted separately.
 			//
 			// Pass startTask: false to prevent the child from beginning its task loop
 			// (and writing to globalState via saveClineMessages → updateTaskHistory)
@@ -3407,7 +3402,6 @@ export class ClineProvider
 			// causing the parent's delegation fields to be lost.
 			const child = await this.createTask(message, undefined, parent as any, {
 				initialTodos,
-				initialStatus: "active",
 				startTask: false,
 			})
 
@@ -3630,9 +3624,9 @@ export class ClineProvider
 
 			// 3) Close child instance if still open (single-open-task invariant).
 			//    This MUST happen BEFORE updating the child's status to "completed" because
-			//    removeClineFromStack() → abortTask(true) → saveClineMessages() writes
-			//    the historyItem with initialStatus (typically "active"), which would
-			//    overwrite a "completed" status set earlier.
+			//    removeClineFromStack() → abortTask(true) → saveClineMessages() calls
+			//    updateTaskHistory which would overwrite a "completed" status set earlier
+			//    (updateTaskHistory spreads incoming fields over existing ones).
 			const current = this.getCurrentTask()
 			if (current?.taskId === childTaskId) {
 				await this.removeClineFromStack()

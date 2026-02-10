@@ -70,10 +70,9 @@ describe("ClineProvider.delegateParentAndOpenChild()", () => {
 
 		// Invariant: parent closed before child creation
 		expect(removeClineFromStack).toHaveBeenCalledTimes(1)
-		// Child task is created with startTask: false and initialStatus: "active"
+		// Child task is created with startTask: false
 		expect(createTask).toHaveBeenCalledWith("Do something", undefined, parentTask, {
 			initialTodos: [],
-			initialStatus: "active",
 			startTask: false,
 		})
 
