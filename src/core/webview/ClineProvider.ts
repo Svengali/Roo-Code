@@ -1815,6 +1815,7 @@ export class ClineProvider
 	async showTaskWithId(id: string) {
 		if (this.delegationInProgress) {
 			this.log("[showTaskWithId] Skipped: delegation in progress")
+			vscode.window.showInformationMessage("Task delegation in progress, please wait...")
 			return
 		}
 		if (id !== this.getCurrentTask()?.taskId) {
@@ -1862,6 +1863,7 @@ export class ClineProvider
 		try {
 			if (this.delegationInProgress) {
 				this.log("[deleteTaskWithId] Skipped: delegation in progress")
+				vscode.window.showInformationMessage("Task delegation in progress, please wait...")
 				return
 			}
 			// get the task directory full path and history item
@@ -3072,6 +3074,7 @@ export class ClineProvider
 	public async cancelTask(): Promise<void> {
 		if (this.delegationInProgress) {
 			this.log("[cancelTask] Skipped: delegation in progress")
+			vscode.window.showInformationMessage("Task delegation in progress, please wait...")
 			return
 		}
 		const task = this.getCurrentTask()
