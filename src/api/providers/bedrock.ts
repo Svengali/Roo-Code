@@ -271,7 +271,9 @@ export class AwsBedrockHandler extends BaseProvider implements SingleCompletionH
 		// We identify targets in the ORIGINAL Anthropic messages (before AI SDK conversion)
 		// because convertToAiSdkMessages() splits user messages containing tool_results into
 		// separate "tool" + "user" role messages, which would skew naive counting.
-		const usePromptCache = Boolean(this.options.awsUsePromptCache && this.supportsAwsPromptCache(modelConfig))
+		const usePromptCache = Boolean(
+			(this.options.awsUsePromptCache ?? true) && this.supportsAwsPromptCache(modelConfig),
+		)
 
 		if (usePromptCache) {
 			const cachePointOption = { bedrock: { cachePoint: { type: "default" as const } } }

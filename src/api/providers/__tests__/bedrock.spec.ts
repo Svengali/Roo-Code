@@ -1287,4 +1287,67 @@ describe("AwsBedrockHandler", () => {
 			expect(mockCaptureException).toHaveBeenCalled()
 		})
 	})
+
+	describe("prompt cache default behavior", () => {
+		function setupMockStreamText() {
+			async function* mockFullStream() {
+				yield { type: "text-delta", text: "response" }
+			}
+			mockStreamText.mockReturnValue({
+				fullStream: mockFullStream(),
+				usage: Promise.resolve({ inputTokens: 10, outputTokens: 5 }),
+				providerMetadata: Promise.resolve({}),
+			})
+		}
+
+		const messages: Anthropic.Messages.MessageParam[] = [{ role: "user", content: "Hello" }]
+
+		it("should enable prompt caching by default when awsUsePromptCache is undefined", async () => {
+			setupMockStreamText()
+
+			const defaultHandler = new AwsBedrockHandler({
+				apiModelId: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+				awsAccessKey: "test-access-key",
+				awsSecretKey: "test-secret-key",
+				awsRegion: "us-east-1",
+				// awsUsePromptCache is intentionally omitted (undefined)
+			})
+
+			const generator = defaultHandler.createMessage("You are a helpful assistant", messages)
+			for await (const _chunk of generator) {
+				// consume the stream
+			}
+
+			expect(mockStreamText).toHaveBeenCalledTimes(1)
+			const callArgs = mockStreamText.mock.calls[0][0]
+
+			// systemProviderOptions should include cachePoint since prompt caching defaults to ON
+			expect(callArgs.systemProviderOptions).toEqual({
+				bedrock: { cachePoint: { type: "default" } },
+			})
+		})
+
+		it("should disable prompt caching when awsUsePromptCache is explicitly false", async () => {
+			setupMockStreamText()
+
+			const disabledHandler = new AwsBedrockHandler({
+				apiModelId: "anthropic.claude-3-5-sonnet-20241022-v2:0",
+				awsAccessKey: "test-access-key",
+				awsSecretKey: "test-secret-key",
+				awsRegion: "us-east-1",
+				awsUsePromptCache: false,
+			})
+
+			const generator = disabledHandler.createMessage("You are a helpful assistant", messages)
+			for await (const _chunk of generator) {
+				// consume the stream
+			}
+
+			expect(mockStreamText).toHaveBeenCalledTimes(1)
+			const callArgs = mockStreamText.mock.calls[0][0]
+
+			// systemProviderOptions should NOT include cachePoint since caching is explicitly disabled
+			expect(callArgs.systemProviderOptions).toBeUndefined()
+		})
+	})
 })
