@@ -36,7 +36,7 @@ describe("delegationMeta.readDelegationMeta", () => {
 		const taskId = "task-with-meta"
 		const taskDir = path.join(tmpBaseDir, "tasks", taskId)
 		await fs.mkdir(taskDir, { recursive: true })
-		const filePath = path.join(taskDir, "task_metadata.json")
+		const filePath = path.join(taskDir, "delegation_metadata.json")
 
 		const meta: DelegationMeta = {
 			status: "delegated",
@@ -58,7 +58,7 @@ describe("delegationMeta.readDelegationMeta", () => {
 		const taskId = "task-extra-keys"
 		const taskDir = path.join(tmpBaseDir, "tasks", taskId)
 		await fs.mkdir(taskDir, { recursive: true })
-		const filePath = path.join(taskDir, "task_metadata.json")
+		const filePath = path.join(taskDir, "delegation_metadata.json")
 
 		await fs.writeFile(
 			filePath,
@@ -83,7 +83,7 @@ describe("delegationMeta.readDelegationMeta", () => {
 		const taskId = "task-corrupt"
 		const taskDir = path.join(tmpBaseDir, "tasks", taskId)
 		await fs.mkdir(taskDir, { recursive: true })
-		const filePath = path.join(taskDir, "task_metadata.json")
+		const filePath = path.join(taskDir, "delegation_metadata.json")
 		await fs.writeFile(filePath, "{not valid json!!!", "utf8")
 
 		const result = await readDelegationMeta({
@@ -98,7 +98,7 @@ describe("delegationMeta.readDelegationMeta", () => {
 		const taskId = "task-non-object"
 		const taskDir = path.join(tmpBaseDir, "tasks", taskId)
 		await fs.mkdir(taskDir, { recursive: true })
-		const filePath = path.join(taskDir, "task_metadata.json")
+		const filePath = path.join(taskDir, "delegation_metadata.json")
 		await fs.writeFile(filePath, JSON.stringify("hello"), "utf8")
 
 		const result = await readDelegationMeta({
@@ -113,7 +113,7 @@ describe("delegationMeta.readDelegationMeta", () => {
 		const taskId = "task-array"
 		const taskDir = path.join(tmpBaseDir, "tasks", taskId)
 		await fs.mkdir(taskDir, { recursive: true })
-		const filePath = path.join(taskDir, "task_metadata.json")
+		const filePath = path.join(taskDir, "delegation_metadata.json")
 		await fs.writeFile(filePath, JSON.stringify([1, 2, 3]), "utf8")
 
 		const result = await readDelegationMeta({
@@ -173,6 +173,6 @@ describe("delegationMeta.saveDelegationMeta", () => {
 
 		expect(hoisted.safeWriteJsonMock).toHaveBeenCalledTimes(1)
 		const [filePath] = hoisted.safeWriteJsonMock.mock.calls[0]
-		expect(filePath).toContain(path.join("tasks", "task-path-check", "task_metadata.json"))
+		expect(filePath).toContain(path.join("tasks", "task-path-check", "delegation_metadata.json"))
 	})
 })

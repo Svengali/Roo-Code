@@ -45,7 +45,7 @@ export async function readDelegationMeta({
 	globalStoragePath,
 }: ReadDelegationMetaOptions): Promise<DelegationMeta | null> {
 	const taskDir = await getTaskDirectoryPath(globalStoragePath, taskId)
-	const filePath = path.join(taskDir, GlobalFileNames.taskMetadata)
+	const filePath = path.join(taskDir, GlobalFileNames.delegationMetadata)
 	const fileExists = await fileExistsAtPath(filePath)
 
 	if (!fileExists) {
@@ -93,7 +93,7 @@ export type SaveDelegationMetaOptions = {
  */
 export async function saveDelegationMeta({ taskId, globalStoragePath, meta }: SaveDelegationMetaOptions) {
 	const taskDir = await getTaskDirectoryPath(globalStoragePath, taskId)
-	const filePath = path.join(taskDir, GlobalFileNames.taskMetadata)
+	const filePath = path.join(taskDir, GlobalFileNames.delegationMetadata)
 
 	// Only write known delegation keys to prevent pollution
 	const sanitized: DelegationMeta = {}
