@@ -1369,7 +1369,6 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				workspace: this.cwd,
 				mode: this._taskMode || defaultModeSlug, // Use the task's own mode, not the current provider mode.
 				apiConfigName: this._taskApiConfigName, // Use the task's own provider profile, not the current provider profile.
-				initialStatus: this.initialStatus,
 			})
 
 			// Emit token/tool usage updates using debounced function
@@ -2476,6 +2475,13 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			this.cancelCurrentRequest()
 		} catch (error) {
 			console.error("Error cancelling current request:", error)
+		}
+
+		// Cancel debounced token usage emitter to prevent zombie callbacks
+		try {
+			this.debouncedEmitTokenUsage.cancel()
+		} catch (error) {
+			console.error("Error cancelling debounced token usage emitter:", error)
 		}
 
 		// Remove provider profile change listener

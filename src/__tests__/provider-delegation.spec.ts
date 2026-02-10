@@ -2,6 +2,12 @@
 
 import { describe, it, expect, vi } from "vitest"
 import { RooCodeEventName } from "@roo-code/types"
+
+vi.mock("../core/task-persistence/delegationMeta", () => ({
+	readDelegationMeta: vi.fn().mockResolvedValue(null),
+	saveDelegationMeta: vi.fn().mockResolvedValue(undefined),
+}))
+
 import { ClineProvider } from "../core/webview/ClineProvider"
 
 describe("ClineProvider.delegateParentAndOpenChild()", () => {
@@ -48,6 +54,7 @@ describe("ClineProvider.delegateParentAndOpenChild()", () => {
 			updateTaskHistory,
 			handleModeSwitch,
 			log: vi.fn(),
+			contextProxy: { globalStorageUri: { fsPath: "/tmp" } },
 		} as unknown as ClineProvider
 
 		const params = {
@@ -70,11 +77,20 @@ describe("ClineProvider.delegateParentAndOpenChild()", () => {
 			startTask: false,
 		})
 
-		// Metadata persistence - parent gets "delegated" status (child status is set at creation via initialStatus)
-		expect(updateTaskHistory).toHaveBeenCalledTimes(1)
+		// Metadata persistence - child gets "active" status, parent gets "delegated" status
+		expect(updateTaskHistory).toHaveBeenCalledTimes(2)
 
-		// Parent set to "delegated"
-		const parentSaved = updateTaskHistory.mock.calls[0][0]
+		// Child set to "active" (first call)
+		const childSaved = updateTaskHistory.mock.calls[0][0]
+		expect(childSaved).toEqual(
+			expect.objectContaining({
+				id: "child-1",
+				status: "active",
+			}),
+		)
+
+		// Parent set to "delegated" (second call)
+		const parentSaved = updateTaskHistory.mock.calls[1][0]
 		expect(parentSaved).toEqual(
 			expect.objectContaining({
 				id: "parent-1",
@@ -130,6 +146,7 @@ describe("ClineProvider.delegateParentAndOpenChild()", () => {
 			updateTaskHistory,
 			handleModeSwitch,
 			log: vi.fn(),
+			contextProxy: { globalStorageUri: { fsPath: "/tmp" } },
 		} as unknown as ClineProvider
 
 		await (ClineProvider.prototype as any).delegateParentAndOpenChild.call(provider, {
@@ -139,7 +156,7 @@ describe("ClineProvider.delegateParentAndOpenChild()", () => {
 			mode: "code",
 		})
 
-		// Verify ordering: createTask → updateTaskHistory → child.start
-		expect(callOrder).toEqual(["createTask", "updateTaskHistory", "child.start"])
+		// Verify ordering: createTask → updateTaskHistory (child) → updateTaskHistory (parent) → child.start
+		expect(callOrder).toEqual(["createTask", "updateTaskHistory", "updateTaskHistory", "child.start"])
 	})
 })

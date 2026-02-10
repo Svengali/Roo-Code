@@ -34,6 +34,10 @@ vi.mock("../core/task-persistence", () => ({
 	saveApiMessages: vi.fn().mockResolvedValue(undefined),
 	saveTaskMessages: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock("../core/task-persistence/delegationMeta", () => ({
+	readDelegationMeta: vi.fn().mockResolvedValue(null),
+	saveDelegationMeta: vi.fn().mockResolvedValue(undefined),
+}))
 
 import { ClineProvider } from "../core/webview/ClineProvider"
 import { readTaskMessages } from "../core/task-persistence/taskMessages"
@@ -145,6 +149,7 @@ describe("History resume delegation - parent metadata transitions", () => {
 				overwriteApiConversationHistory: vi.fn().mockResolvedValue(undefined),
 			}),
 			updateTaskHistory: vi.fn().mockResolvedValue([]),
+			log: vi.fn(),
 		} as unknown as ClineProvider
 
 		// Start with existing messages in history
@@ -228,6 +233,7 @@ describe("History resume delegation - parent metadata transitions", () => {
 				overwriteApiConversationHistory: vi.fn().mockResolvedValue(undefined),
 			}),
 			updateTaskHistory: vi.fn().mockResolvedValue([]),
+			log: vi.fn(),
 		} as unknown as ClineProvider
 
 		// Include an assistant message with new_task tool_use to exercise the tool_result path
@@ -314,6 +320,7 @@ describe("History resume delegation - parent metadata transitions", () => {
 				overwriteApiConversationHistory: vi.fn().mockResolvedValue(undefined),
 			}),
 			updateTaskHistory: vi.fn().mockResolvedValue([]),
+			log: vi.fn(),
 		} as unknown as ClineProvider
 
 		// No assistant tool_use in history
@@ -549,6 +556,7 @@ describe("History resume delegation - parent metadata transitions", () => {
 				overwriteApiConversationHistory: vi.fn().mockResolvedValue(undefined),
 			}),
 			updateTaskHistory: vi.fn().mockResolvedValue([]),
+			log: vi.fn(),
 		} as unknown as ClineProvider
 
 		vi.mocked(readTaskMessages).mockResolvedValue([])
@@ -748,6 +756,7 @@ describe("History resume delegation - parent metadata transitions", () => {
 				overwriteApiConversationHistory: vi.fn().mockResolvedValue(undefined),
 			}),
 			updateTaskHistory: vi.fn().mockResolvedValue([]),
+			log: vi.fn(),
 		} as unknown as ClineProvider
 
 		// Mock read failures or empty returns
