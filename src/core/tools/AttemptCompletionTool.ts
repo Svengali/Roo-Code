@@ -216,7 +216,7 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 				})
 				await provider.persistDelegationMeta(parentTaskId, {
 					status: "active",
-					awaitingChildId: undefined,
+					awaitingChildId: null,
 					delegatedToId: parentHistory.delegatedToId,
 					childIds,
 				})

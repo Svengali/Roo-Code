@@ -25,6 +25,15 @@ vi.mock("../../../shared/package", () => ({
 	},
 }))
 
+// Mock TelemetryService
+vi.mock("@roo-code/telemetry", () => ({
+	TelemetryService: {
+		instance: {
+			captureTaskCompleted: vi.fn(),
+		},
+	},
+}))
+
 import { attemptCompletionTool, AttemptCompletionCallbacks } from "../AttemptCompletionTool"
 import { Task } from "../../task/Task"
 import * as vscode from "vscode"
@@ -467,6 +476,120 @@ describe("attemptCompletionTool", () => {
 				expect(mockTask.consecutiveMistakeCount).toBe(0)
 				expect(mockTask.recordToolError).not.toHaveBeenCalled()
 			})
+		})
+	})
+
+	describe("delegation flow", () => {
+		let mockProvider: {
+			getTaskWithId: ReturnType<typeof vi.fn>
+			reopenParentFromDelegation: ReturnType<typeof vi.fn>
+			updateTaskHistory: ReturnType<typeof vi.fn>
+			persistDelegationMeta: ReturnType<typeof vi.fn>
+		}
+
+		let block: AttemptCompletionToolUse
+		let callbacks: AttemptCompletionCallbacks
+
+		beforeEach(() => {
+			vi.useFakeTimers()
+
+			mockProvider = {
+				getTaskWithId: vi.fn(),
+				reopenParentFromDelegation: vi.fn(),
+				updateTaskHistory: vi.fn(),
+				persistDelegationMeta: vi.fn(),
+			}
+
+			Object.defineProperty(mockTask, "parentTaskId", { value: "parent-123", writable: true, configurable: true })
+			Object.defineProperty(mockTask, "providerRef", {
+				value: new WeakRef(mockProvider),
+				writable: true,
+				configurable: true,
+			})
+
+			// Default: child task is active (triggers delegation path)
+			mockProvider.getTaskWithId.mockResolvedValue({
+				historyItem: { status: "active", childIds: [] },
+			})
+
+			mockAskFinishSubTaskApproval.mockResolvedValue(true)
+
+			block = {
+				type: "tool_use",
+				name: "attempt_completion",
+				params: { result: "Task completed successfully" },
+				nativeArgs: { result: "Task completed successfully" },
+				partial: false,
+			}
+
+			callbacks = {
+				askApproval: mockAskApproval,
+				handleError: mockHandleError,
+				pushToolResult: mockPushToolResult,
+				askFinishSubTaskApproval: mockAskFinishSubTaskApproval,
+				toolDescription: mockToolDescription,
+			}
+		})
+
+		afterEach(() => {
+			vi.useRealTimers()
+		})
+
+		it("retries delegation once on first failure and succeeds", async () => {
+			mockProvider.reopenParentFromDelegation
+				.mockRejectedValueOnce(new Error("transient error"))
+				.mockResolvedValueOnce(undefined)
+
+			const promise = attemptCompletionTool.handle(mockTask as Task, block, callbacks)
+			await vi.advanceTimersByTimeAsync(500)
+			await promise
+
+			expect(mockProvider.reopenParentFromDelegation).toHaveBeenCalledTimes(2)
+			expect(mockPushToolResult).toHaveBeenCalledWith("")
+		})
+
+		it("repairs parent to active when both delegation attempts fail", async () => {
+			mockProvider.reopenParentFromDelegation.mockRejectedValue(new Error("persistent error"))
+
+			// First call: child task check in execute(); second call: parent repair in delegateToParent()
+			mockProvider.getTaskWithId
+				.mockResolvedValueOnce({ historyItem: { status: "active", childIds: [] } })
+				.mockResolvedValueOnce({
+					historyItem: { status: "delegated", childIds: [], delegatedToId: "child-task" },
+				})
+
+			mockProvider.updateTaskHistory.mockResolvedValue([])
+			mockProvider.persistDelegationMeta.mockResolvedValue(undefined)
+
+			const promise = attemptCompletionTool.handle(mockTask as Task, block, callbacks)
+			await vi.advanceTimersByTimeAsync(500)
+			await promise
+
+			expect(mockProvider.updateTaskHistory).toHaveBeenCalledWith(
+				expect.objectContaining({ status: "active", awaitingChildId: undefined }),
+			)
+			expect(mockProvider.persistDelegationMeta).toHaveBeenCalledWith(
+				"parent-123",
+				expect.objectContaining({ status: "active", awaitingChildId: null }),
+			)
+			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("Delegation to parent task failed"))
+		})
+
+		it("handles repair failure gracefully when both delegation and repair fail", async () => {
+			mockProvider.reopenParentFromDelegation.mockRejectedValue(new Error("persistent error"))
+
+			// First call: child task check; second call: parent repair (will succeed but updateTaskHistory throws)
+			mockProvider.getTaskWithId
+				.mockResolvedValueOnce({ historyItem: { status: "active", childIds: [] } })
+				.mockResolvedValueOnce({ historyItem: { status: "delegated", childIds: [] } })
+
+			mockProvider.updateTaskHistory.mockRejectedValue(new Error("repair failed"))
+
+			const promise = attemptCompletionTool.handle(mockTask as Task, block, callbacks)
+			await vi.advanceTimersByTimeAsync(500)
+			await promise // should NOT throw — repair error is caught internally
+
+			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("Delegation to parent task failed"))
 		})
 	})
 })

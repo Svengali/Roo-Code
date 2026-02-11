@@ -3325,6 +3325,8 @@ export class ClineProvider
 		}
 		this.delegationInProgress = true
 
+		const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
+
 		try {
 			// Metadata-driven delegation is always enabled
 
@@ -3432,7 +3434,6 @@ export class ClineProvider
 
 			// Per-task file backup is non-critical — globalState is the primary source
 			try {
-				const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
 				await saveDelegationMeta({
 					taskId: parentTaskId,
 					globalStoragePath,
@@ -3446,6 +3447,9 @@ export class ClineProvider
 			} catch (err) {
 				this.log(
 					`[delegateParentAndOpenChild] Non-critical: Failed to write delegation metadata files for ${parentTaskId} -> ${child.taskId}: ${(err as Error)?.message ?? String(err)}`,
+				)
+				vscode.window.showWarningMessage(
+					"Delegation metadata could not be saved. Task delegation may be in a degraded state.",
 				)
 			}
 
@@ -3462,7 +3466,6 @@ export class ClineProvider
 					try {
 						const { historyItem: parentHistory } = await this.getTaskWithId(parentTaskId)
 						await this.updateTaskHistory({ ...parentHistory, status: "active", awaitingChildId: undefined })
-						const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
 						await saveDelegationMeta({
 							taskId: parentTaskId,
 							globalStoragePath,
