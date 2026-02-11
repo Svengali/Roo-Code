@@ -2050,7 +2050,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 	 * child task begins writing its own history (avoiding a read-modify-write
 	 * race on globalState).
 	 */
-	public start(): void {
+	public start(): Promise<void> | void {
 		if (this._started) {
 			return
 		}
@@ -2059,7 +2059,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 		const { task, images } = this.metadata
 
 		if (task || images) {
-			this.startTask(task ?? undefined, images ?? undefined)
+			return this.startTask(task ?? undefined, images ?? undefined)
 		}
 	}
 

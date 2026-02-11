@@ -15,7 +15,7 @@ describe("ClineProvider.delegateParentAndOpenChild()", () => {
 		const providerEmit = vi.fn()
 		const parentTask = { taskId: "parent-1", emit: vi.fn() } as any
 
-		const childStart = vi.fn()
+		const childStart = vi.fn().mockResolvedValue(undefined)
 		const updateTaskHistory = vi.fn()
 		const removeClineFromStack = vi.fn().mockResolvedValue(undefined)
 		const createTask = vi.fn().mockResolvedValue({ taskId: "child-1", start: childStart })
@@ -114,7 +114,10 @@ describe("ClineProvider.delegateParentAndOpenChild()", () => {
 		const callOrder: string[] = []
 
 		const parentTask = { taskId: "parent-1", emit: vi.fn() } as any
-		const childStart = vi.fn(() => callOrder.push("child.start"))
+		const childStart = vi.fn(() => {
+			callOrder.push("child.start")
+			return Promise.resolve()
+		})
 
 		const updateTaskHistory = vi.fn(async () => {
 			callOrder.push("updateTaskHistory")

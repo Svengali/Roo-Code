@@ -14,11 +14,11 @@ import { getTaskDirectoryPath } from "../../utils/storage"
  */
 export interface DelegationMeta {
 	status?: "active" | "delegated" | "completed"
-	delegatedToId?: string
-	awaitingChildId?: string
+	delegatedToId?: string | null
+	awaitingChildId?: string | null
 	childIds?: string[]
-	completedByChildId?: string
-	completionResultSummary?: string
+	completedByChildId?: string | null
+	completionResultSummary?: string | null
 }
 
 /**
@@ -74,7 +74,7 @@ export async function readDelegationMeta({
 
 		for (const key of Object.keys(raw)) {
 			if (DELEGATION_META_KEYS.has(key)) {
-				;(meta as any)[key] = raw[key]
+				;(meta as Record<string, unknown>)[key] = raw[key]
 			}
 		}
 
@@ -107,7 +107,7 @@ export async function saveDelegationMeta({ taskId, globalStoragePath, meta }: Sa
 
 	for (const key of Object.keys(meta)) {
 		if (DELEGATION_META_KEYS.has(key)) {
-			;(sanitized as any)[key] = (meta as any)[key]
+			;(sanitized as Record<string, unknown>)[key] = (meta as Record<string, unknown>)[key]
 		}
 	}
 

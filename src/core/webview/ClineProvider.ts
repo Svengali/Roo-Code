@@ -530,7 +530,7 @@ export class ClineProvider
 							globalStoragePath,
 							meta: {
 								status: "active",
-								awaitingChildId: undefined,
+								awaitingChildId: null,
 								delegatedToId: parentHistory.delegatedToId,
 								childIds: parentHistory.childIds,
 								completedByChildId: parentHistory.completedByChildId,
@@ -1756,15 +1756,9 @@ export class ClineProvider
 			const delegationMeta = await readDelegationMeta({ taskId: id, globalStoragePath })
 
 			if (delegationMeta) {
-				if (delegationMeta.status !== undefined) historyItem.status = delegationMeta.status
-				if (delegationMeta.delegatedToId !== undefined) historyItem.delegatedToId = delegationMeta.delegatedToId
-				if (delegationMeta.awaitingChildId !== undefined)
-					historyItem.awaitingChildId = delegationMeta.awaitingChildId
-				if (delegationMeta.childIds !== undefined) historyItem.childIds = delegationMeta.childIds
-				if (delegationMeta.completedByChildId !== undefined)
-					historyItem.completedByChildId = delegationMeta.completedByChildId
-				if (delegationMeta.completionResultSummary !== undefined)
-					historyItem.completionResultSummary = delegationMeta.completionResultSummary
+				for (const [key, value] of Object.entries(delegationMeta)) {
+					;(historyItem as Record<string, unknown>)[key] = value === null ? undefined : value
+				}
 			}
 		} catch (err) {
 			// Non-fatal: fall back to globalState values
@@ -3461,36 +3455,37 @@ export class ClineProvider
 			}
 
 			// 6) Start the child task now that parent metadata is safely persisted.
-			try {
-				child.start()
-			} catch (err) {
-				this.log(
-					`[delegateParentAndOpenChild] child.start() failed for ${child.taskId}: ${
-						(err as Error)?.message ?? String(err)
-					}`,
-				)
-				// Repair parent status back to active
-				try {
-					const { historyItem: parentHistory } = await this.getTaskWithId(parentTaskId)
-					await this.updateTaskHistory({ ...parentHistory, status: "active", awaitingChildId: undefined })
-					const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
-					await saveDelegationMeta({
-						taskId: parentTaskId,
-						globalStoragePath,
-						meta: {
-							status: "active",
-							awaitingChildId: undefined,
-							delegatedToId: parentHistory.delegatedToId,
-							childIds: parentHistory.childIds,
-						},
-					})
-				} catch (repairErr) {
+			const startPromise = child.start()
+			if (startPromise) {
+				startPromise.catch(async (err) => {
 					this.log(
-						`[delegateParentAndOpenChild] Failed to repair parent after child.start() failure: ${
-							(repairErr as Error)?.message ?? String(repairErr)
+						`[delegateParentAndOpenChild] child.start() failed for ${child.taskId}: ${
+							(err as Error)?.message ?? String(err)
 						}`,
 					)
-				}
+					// Repair parent status back to active
+					try {
+						const { historyItem: parentHistory } = await this.getTaskWithId(parentTaskId)
+						await this.updateTaskHistory({ ...parentHistory, status: "active", awaitingChildId: undefined })
+						const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
+						await saveDelegationMeta({
+							taskId: parentTaskId,
+							globalStoragePath,
+							meta: {
+								status: "active",
+								awaitingChildId: null,
+								delegatedToId: parentHistory.delegatedToId,
+								childIds: parentHistory.childIds,
+							},
+						})
+					} catch (repairErr) {
+						this.log(
+							`[delegateParentAndOpenChild] Failed to repair parent after child.start() failure: ${
+								(repairErr as Error)?.message ?? String(repairErr)
+							}`,
+						)
+					}
+				})
 			}
 
 			// 7) Emit TaskDelegated (provider-level)
@@ -3689,7 +3684,7 @@ export class ClineProvider
 					status: "active",
 					completedByChildId: childTaskId,
 					completionResultSummary,
-					awaitingChildId: undefined,
+					awaitingChildId: null,
 					childIds,
 				},
 			})
