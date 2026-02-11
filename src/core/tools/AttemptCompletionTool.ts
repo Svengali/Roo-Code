@@ -233,7 +233,7 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 					`Delegation to parent task failed: ${error instanceof Error ? error.message : String(error)}. Completing as standalone task.`,
 				),
 			)
-			return false
+			return true
 		}
 	}
 
