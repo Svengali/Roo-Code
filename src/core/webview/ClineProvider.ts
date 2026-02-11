@@ -104,7 +104,7 @@ import {
 	saveTaskMessages,
 	type RooMessage,
 } from "../task-persistence"
-import { readDelegationMeta, saveDelegationMeta } from "../task-persistence/delegationMeta"
+import { type DelegationMeta, readDelegationMeta, saveDelegationMeta } from "../task-persistence/delegationMeta"
 import { readTaskMessages } from "../task-persistence/taskMessages"
 import { getNonce } from "./getNonce"
 import { getUri } from "./getUri"
@@ -2678,6 +2678,17 @@ export class ClineProvider
 	}
 
 	/**
+	 * Convenience wrapper around the standalone saveDelegationMeta function,
+	 * injecting globalStoragePath from this provider's context.
+	 * Exposed so tools (e.g. AttemptCompletionTool) can persist delegation
+	 * metadata through the DelegationProvider interface.
+	 */
+	async persistDelegationMeta(taskId: string, meta: DelegationMeta): Promise<void> {
+		const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
+		await saveDelegationMeta({ taskId, globalStoragePath, meta })
+	}
+
+	/**
 	 * Broadcasts a task history update to the webview.
 	 * This sends a lightweight message with just the task history, rather than the full state.
 	 * @param history The task history to broadcast (if not provided, reads from global state)
@@ -3632,7 +3643,7 @@ export class ClineProvider
 			//    (updateTaskHistory spreads incoming fields over existing ones).
 			const current = this.getCurrentTask()
 			if (current?.taskId === childTaskId) {
-				await this.removeClineFromStack()
+				await this.removeClineFromStack({ skipDelegationRepair: true })
 			}
 
 			// 4) Update child metadata to "completed" status.
@@ -3658,9 +3669,12 @@ export class ClineProvider
 			}
 
 			// 5) Update parent metadata and persist BEFORE emitting completion event
-			const childIds = Array.from(new Set([...(historyItem.childIds ?? []), childTaskId]))
-			const updatedHistory: typeof historyItem = {
-				...historyItem,
+			//    Re-read parent to avoid stale-read TOCTOU: historyItem was loaded at step 1
+			//    but many async operations (message injection, child abort) have elapsed since.
+			const { historyItem: freshParent } = await this.getTaskWithId(parentTaskId)
+			const childIds = Array.from(new Set([...(freshParent.childIds ?? []), childTaskId]))
+			const updatedHistory: typeof freshParent = {
+				...freshParent,
 				status: "active",
 				completedByChildId: childTaskId,
 				completionResultSummary,
