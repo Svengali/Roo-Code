@@ -221,11 +221,30 @@ export class AttemptCompletionTool extends BaseTool<"attempt_completion"> {
 					childIds,
 				})
 			} catch (repairError) {
-				console.error(
-					`[AttemptCompletionTool] Failed to repair parent ${parentTaskId} after delegation failure: ${
-						repairError instanceof Error ? repairError.message : String(repairError)
-					}`,
-				)
+				// Disk-only fallback when parent is missing from globalState
+				if (repairError instanceof Error && repairError.message === "Task not found") {
+					try {
+						await provider.persistDelegationMeta(parentTaskId, {
+							status: "active",
+							awaitingChildId: null,
+						})
+						console.warn(
+							`[AttemptCompletionTool] Repaired parent ${parentTaskId} via disk fallback (not in globalState)`,
+						)
+					} catch (diskErr) {
+						console.error(
+							`[AttemptCompletionTool] Disk fallback repair also failed for ${parentTaskId}: ${
+								diskErr instanceof Error ? diskErr.message : String(diskErr)
+							}`,
+						)
+					}
+				} else {
+					console.error(
+						`[AttemptCompletionTool] Failed to repair parent ${parentTaskId} after delegation failure: ${
+							repairError instanceof Error ? repairError.message : String(repairError)
+						}`,
+					)
+				}
 			}
 
 			pushToolResult(

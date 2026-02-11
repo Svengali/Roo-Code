@@ -542,12 +542,43 @@ export class ClineProvider
 						)
 					}
 				} catch (err) {
-					// Non-fatal: log but do not block the pop operation.
-					this.log(
-						`[ClineProvider#removeClineFromStack] Failed to repair parent metadata for ${parentTaskId} (non-fatal): ${
-							err instanceof Error ? err.message : String(err)
-						}`,
-					)
+					// Disk-only fallback when parent is missing from globalState
+					if (err instanceof Error && err.message === "Task not found") {
+						try {
+							const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
+							const delegationMeta = await readDelegationMeta({ taskId: parentTaskId, globalStoragePath })
+							if (
+								delegationMeta?.status === "delegated" &&
+								delegationMeta?.awaitingChildId === childTaskId
+							) {
+								await saveDelegationMeta({
+									taskId: parentTaskId,
+									globalStoragePath,
+									meta: {
+										status: "active",
+										awaitingChildId: null,
+										delegatedToId: delegationMeta.delegatedToId,
+										childIds: delegationMeta.childIds,
+									},
+								})
+								this.log(
+									`[ClineProvider#removeClineFromStack] Repaired parent ${parentTaskId} via disk fallback (not in globalState)`,
+								)
+							}
+						} catch (diskErr) {
+							this.log(
+								`[ClineProvider#removeClineFromStack] Disk fallback repair also failed for ${parentTaskId}: ${
+									diskErr instanceof Error ? diskErr.message : String(diskErr)
+								}`,
+							)
+						}
+					} else {
+						this.log(
+							`[ClineProvider#removeClineFromStack] Failed to repair parent metadata for ${parentTaskId} (non-fatal): ${
+								err instanceof Error ? err.message : String(err)
+							}`,
+						)
+					}
 				}
 			}
 		}

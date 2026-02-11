@@ -591,5 +591,26 @@ describe("attemptCompletionTool", () => {
 
 			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("Delegation to parent task failed"))
 		})
+
+		it("repairs parent via disk fallback when getTaskWithId throws Task not found", async () => {
+			mockProvider.reopenParentFromDelegation.mockRejectedValue(new Error("persistent error"))
+
+			// First call: child task check in execute(); second call: parent repair throws "Task not found"
+			mockProvider.getTaskWithId
+				.mockResolvedValueOnce({ historyItem: { status: "active", childIds: [] } })
+				.mockRejectedValueOnce(new Error("Task not found"))
+
+			mockProvider.persistDelegationMeta.mockResolvedValue(undefined)
+
+			const promise = attemptCompletionTool.handle(mockTask as Task, block, callbacks)
+			await vi.advanceTimersByTimeAsync(500)
+			await promise
+
+			expect(mockProvider.persistDelegationMeta).toHaveBeenCalledWith("parent-123", {
+				status: "active",
+				awaitingChildId: null,
+			})
+			expect(mockPushToolResult).toHaveBeenCalledWith(expect.stringContaining("Delegation to parent task failed"))
+		})
 	})
 })
