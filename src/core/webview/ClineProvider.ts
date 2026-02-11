@@ -3414,32 +3414,29 @@ export class ClineProvider
 			})
 
 			// 4b) Persist child's initial status in globalState (saveClineMessages no longer writes status)
-			await this.updateTaskHistory({ id: child.taskId, status: "active" } as HistoryItem, { broadcast: false })
+			const { historyItem: childHistory } = await this.getTaskWithId(child.taskId)
+			await this.updateTaskHistory({ ...childHistory, status: "active" }, { broadcast: false })
 
 			// 5) Persist parent delegation metadata BEFORE the child starts writing.
-			try {
-				const { historyItem } = await this.getTaskWithId(parentTaskId)
-				const childIds = Array.from(new Set([...(historyItem.childIds ?? []), child.taskId]))
-				const updatedHistory: typeof historyItem = {
-					...historyItem,
-					status: "delegated",
-					delegatedToId: child.taskId,
-					awaitingChildId: child.taskId,
-					childIds,
-				}
-				await this.updateTaskHistory(updatedHistory)
+			// updateTaskHistory (globalState) is critical — without it, parent won't show as delegated
+			const { historyItem } = await this.getTaskWithId(parentTaskId)
+			const childIds = Array.from(new Set([...(historyItem.childIds ?? []), child.taskId]))
+			const updatedHistory = {
+				...historyItem,
+				status: "delegated" as const,
+				delegatedToId: child.taskId,
+				awaitingChildId: child.taskId,
+				childIds,
+			}
+			await this.updateTaskHistory(updatedHistory)
 
-				// Write delegation metadata to per-task file (cross-process-safe source of truth)
+			// Per-task file backup is non-critical — globalState is the primary source
+			try {
 				const globalStoragePath = this.contextProxy.globalStorageUri.fsPath
 				await saveDelegationMeta({
 					taskId: parentTaskId,
 					globalStoragePath,
-					meta: {
-						status: "delegated",
-						delegatedToId: child.taskId,
-						awaitingChildId: child.taskId,
-						childIds,
-					},
+					meta: { status: "delegated", delegatedToId: child.taskId, awaitingChildId: child.taskId, childIds },
 				})
 				await saveDelegationMeta({
 					taskId: child.taskId,
@@ -3448,9 +3445,7 @@ export class ClineProvider
 				})
 			} catch (err) {
 				this.log(
-					`[delegateParentAndOpenChild] Failed to persist parent metadata for ${parentTaskId} -> ${child.taskId}: ${
-						(err as Error)?.message ?? String(err)
-					}`,
+					`[delegateParentAndOpenChild] Non-critical: Failed to write delegation metadata files for ${parentTaskId} -> ${child.taskId}: ${(err as Error)?.message ?? String(err)}`,
 				)
 			}
 

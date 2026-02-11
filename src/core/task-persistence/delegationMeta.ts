@@ -78,6 +78,29 @@ export async function readDelegationMeta({
 			}
 		}
 
+		// Validate value types to prevent corrupted files from propagating invalid data
+		if (
+			meta.status !== undefined &&
+			meta.status !== null &&
+			!["active", "delegated", "completed"].includes(meta.status as string)
+		) {
+			delete (meta as Record<string, unknown>).status
+		}
+		if (meta.childIds !== undefined && meta.childIds !== null && !Array.isArray(meta.childIds)) {
+			delete (meta as Record<string, unknown>).childIds
+		}
+		for (const key of [
+			"delegatedToId",
+			"awaitingChildId",
+			"completedByChildId",
+			"completionResultSummary",
+		] as const) {
+			const val = meta[key]
+			if (val !== undefined && val !== null && typeof val !== "string") {
+				delete (meta as Record<string, unknown>)[key]
+			}
+		}
+
 		return meta
 	} catch (error) {
 		console.warn(
