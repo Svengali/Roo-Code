@@ -470,7 +470,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 			// Add to content and present
 			this.assistantMessageContent.push(partialToolUse)
 			this.userMessageContentReady = false
-			presentAssistantMessage(this)
+			presentAssistantMessage(this).catch(() => {})
 		} else if (event.type === "tool_call_delta") {
 			// Process chunk using streaming JSON parser
 			const partialToolUse = NativeToolCallParser.processStreamingChunk(event.id, event.delta)
@@ -486,7 +486,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					this.assistantMessageContent[toolUseIndex] = partialToolUse
 
 					// Present updated tool use
-					presentAssistantMessage(this)
+					presentAssistantMessage(this).catch(() => {})
 				}
 			}
 		} else if (event.type === "tool_call_end") {
@@ -512,7 +512,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				this.userMessageContentReady = false
 
 				// Present the finalized tool call
-				presentAssistantMessage(this)
+				presentAssistantMessage(this).catch(() => {})
 			} else if (toolUseIndex !== undefined) {
 				// finalizeStreamingToolCall returned null (malformed JSON or missing args)
 				// Mark the tool as non-partial so it's presented as complete, but execution
@@ -531,7 +531,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 				this.userMessageContentReady = false
 
 				// Present the tool call - validation will handle missing params
-				presentAssistantMessage(this)
+				presentAssistantMessage(this).catch(() => {})
 			}
 		}
 	}
@@ -3121,7 +3121,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 
 								// Present the tool call to user - presentAssistantMessage will execute
 								// tools sequentially and accumulate all results in userMessageContent
-								presentAssistantMessage(this)
+								presentAssistantMessage(this).catch(() => {})
 								break
 							}
 							case "text": {
@@ -3140,7 +3140,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 									})
 									this.userMessageContentReady = false
 								}
-								presentAssistantMessage(this)
+								presentAssistantMessage(this).catch(() => {})
 								break
 							}
 							case "response_message":
@@ -3467,7 +3467,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 							this.userMessageContentReady = false
 
 							// Present the finalized tool call
-							presentAssistantMessage(this)
+							presentAssistantMessage(this).catch(() => {})
 						} else if (toolUseIndex !== undefined) {
 							// finalizeStreamingToolCall returned null (malformed JSON or missing args)
 							// We still need to mark the tool as non-partial so it gets executed
@@ -3486,7 +3486,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 							this.userMessageContentReady = false
 
 							// Present the tool call - validation will handle missing params
-							presentAssistantMessage(this)
+							presentAssistantMessage(this).catch(() => {})
 						}
 					}
 				}
@@ -3720,7 +3720,7 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					// If there is content to update then it will complete and
 					// update `this.userMessageContentReady` to true, which we
 					// `pWaitFor` before making the next request.
-					presentAssistantMessage(this)
+					presentAssistantMessage(this).catch(() => {})
 				}
 
 				if (hasTextContent || hasToolUses) {
@@ -3740,7 +3740,15 @@ export class Task extends EventEmitter<TaskEvents> implements TaskLike {
 					// 	this.userMessageContentReady = true
 					// }
 
-					await pWaitFor(() => this.userMessageContentReady)
+					try {
+						await pWaitFor(() => this.userMessageContentReady, { timeout: 60_000 })
+					} catch {
+						console.error(
+							`[Task#recursivelyMakeClineRequests] pWaitFor(userMessageContentReady) timed out after 60s for task ${this.taskId}. ` +
+								`abort=${this.abort}, streamingIndex=${this.currentStreamingContentIndex}, contentLength=${this.assistantMessageContent.length}`,
+						)
+						this.userMessageContentReady = true
+					}
 
 					// If the model did not tool use, then we need to tell it to
 					// either use a tool or attempt_completion.
